@@ -1,0 +1,17 @@
+{
+  "name": "ae-mcp",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "MCP server bridging Claude Desktop and After Effects",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0",
+    "zod": "^3.22.0"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

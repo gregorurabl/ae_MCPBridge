@@ -1,0 +1,5 @@
+{
+  "base": "C:\\Active_EDIT\\GITHUB\\ae_MCPBridge\\ae-mcp",
+  "commands": "C:\\Active_EDIT\\GITHUB\\ae_MCPBridge\\ae-mcp/bridge/commands",
+  "responses": "C:\\Active_EDIT\\GITHUB\\ae_MCPBridge\\ae-mcp/bridge/responses"
+}

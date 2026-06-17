@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "after-effects": {
+      "command": "node",
+      "args": ["C:/Active_EDIT/GITHUB/ae_MCPBridge/ae-mcp/server.js"]
+    }
+  }
+}
