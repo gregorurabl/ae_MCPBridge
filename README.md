@@ -1,6 +1,6 @@
-# AE MCP Bridge – Installation Guide
+# AE MCP Bridge
 
-This guide connects Claude Desktop to Adobe After Effects, allowing Claude to execute JSX commands directly inside an open AE project (list compositions, create shapes, set expressions, trigger the render queue).
+The AE MCP Bridge connects Claude Desktop to Adobe After Effects, allowing Claude to execute JSX commands directly inside an open AE project (list compositions, create shapes, set expressions, trigger the render queue).
 
 **Prerequisite:** After Effects and Claude Desktop are already installed. No other tools are required beforehand.
 
@@ -191,3 +191,29 @@ Currently available tools:
 - **render_queue** – starts the render queue
 
 The AE panel shows the bridge status and allows pausing the polling via the "Pause Polling" button, without having to close AE.
+
+---
+ 
+## Example Prompts
+ 
+**get_compositions:**
+```
+List all compositions in the current project.
+```
+ 
+**run_jsx:**
+```
+Create a new text layer with the content "Hello World" in the active composition.
+```
+ 
+**set_expression:**
+```
+On the layer "Logo" in the composition "Intro", set a wiggle expression
+on position with frequency 2 and amplitude 30.
+```
+ 
+**render_queue:**
+```
+Start rendering the composition "Final Cut".
+```
+ 
