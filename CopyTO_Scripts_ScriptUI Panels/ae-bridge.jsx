@@ -2,7 +2,6 @@
 // Dockable ScriptUI panel - place in ScriptUI Panels/
 // Polls a commands/ directory and writes responses into responses/
 
-// Panel initialization: works as dockable panel and as standalone dialog
 var panel = (this instanceof Panel) ? this : new Window("palette", "AE Bridge", undefined, { resizeable: true });
 
 // Path to the config file next to this script.
@@ -18,9 +17,9 @@ var config = {
 };
 
 var isPaused = false;
+var isStarted = false; // guards against double-registering scheduleTask
 
 // Minimal JSON parser for ExtendScript (no native JSON object available)
-// Supports flat objects with string values only - sufficient for the config
 function parseJSON(str) {
     var obj = {};
     str = str.replace(/^\s*\{/, "").replace(/\}\s*$/, "");
@@ -32,7 +31,6 @@ function parseJSON(str) {
     return obj;
 }
 
-// Serializes a flat object with string values only into JSON
 function serializeJSON(obj) {
     var parts = [];
     for (var key in obj) {
@@ -43,7 +41,6 @@ function serializeJSON(obj) {
     return "{\n  " + parts.join(",\n  ") + "\n}";
 }
 
-// Serializes the result object from pollCommands { success, data, error }
 function serializeResult(result) {
     var successStr = result.success ? "true" : "false";
     var dataStr = result.data !== null ? '"' + String(result.data).replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/\n/g, "\\n") + '"' : "null";
@@ -51,7 +48,6 @@ function serializeResult(result) {
     return '{"success":' + successStr + ',"data":' + dataStr + ',"error":' + errorStr + '}';
 }
 
-// Read config from disk; creates it with defaults on first run
 function loadConfig() {
     var f = new File(CONFIG_PATH);
     if (!f.exists) {
@@ -68,7 +64,6 @@ function loadConfig() {
     }
 }
 
-// Write config to disk
 function saveConfig() {
     var f = new File(CONFIG_PATH);
     f.open("w");
@@ -76,7 +71,6 @@ function saveConfig() {
     f.close();
 }
 
-// Create bridge directories if missing
 function ensureDirectories() {
     var dirs = [
         new Folder(config.commands),
@@ -87,7 +81,6 @@ function ensureDirectories() {
     }
 }
 
-// Polling function, invoked repeatedly via scheduleTask
 function pollCommands() {
     if (isPaused) return;
 
@@ -97,14 +90,13 @@ function pollCommands() {
     var files = dir.getFiles("*.jsx");
     if (files.length === 0) return;
 
-    // Oldest file first (getFiles returns alphabetically sorted, UUID-based names)
     var cmdFile = files[0];
     var cmdId = cmdFile.name.replace(".jsx", "");
 
     cmdFile.open("r");
     var code = cmdFile.read();
     cmdFile.close();
-    cmdFile.remove(); // remove before eval to prevent double execution
+    cmdFile.remove();
 
     var result = { success: false, data: null, error: null };
 
@@ -122,12 +114,33 @@ function pollCommands() {
     responseFile.close();
 }
 
-// Update status label text
 function updateStatusLabel() {
+    if (!isStarted) {
+        panel.statusLabel.text = "Initializing...";
+        return;
+    }
     panel.statusLabel.text = isPaused ? "Paused" : "Active - Polling every 500ms";
 }
 
-// Toggle pause state
+// Idempotent: safe to call multiple times, only registers scheduleTask once per "session"
+function engagePolling() {
+    if (isStarted) return;
+    isStarted = true;
+    app.scheduleTask("pollCommands()", 500, true);
+    updateStatusLabel();
+}
+
+// Manual recovery: mirrors what closing and reopening the panel via the Window menu
+// currently does, without requiring the user to leave the panel.
+// Forces a fresh scheduleTask registration attempt and reloads config/directories.
+function reconnect() {
+    isPaused = false;
+    loadConfig();
+    ensureDirectories();
+    isStarted = false; // force re-registration even if engagePolling ran before
+    engagePolling();
+}
+
 function togglePause() {
     isPaused = !isPaused;
     updateStatusLabel();
@@ -152,11 +165,31 @@ panel.pauseBtn = panel.add("button", undefined, "Pause Polling");
 panel.pauseBtn.alignment = ["fill", "top"];
 panel.pauseBtn.onClick = function() { togglePause(); };
 
+panel.reconnectBtn = panel.add("button", undefined, "Reconnect");
+panel.reconnectBtn.alignment = ["fill", "top"];
+panel.reconnectBtn.onClick = function() { reconnect(); };
+
 // Initialization
 loadConfig();
 ensureDirectories();
-app.scheduleTask("pollCommands()", 500, true);
 updateStatusLabel();
+
+// Primary attempt: register immediately, as before.
+engagePolling();
+
+// Secondary safety net: also (re-)attempt once the panel actually finishes rendering.
+// On a dockable panel restored as part of a saved workspace at AE launch, app.scheduleTask
+// calls made during the panel's raw script-load phase can silently fail to register
+// before AE's main idle loop is fully active. Binding to "show" defers the call until
+// the panel is genuinely rendered, which happens later and more reliably.
+// engagePolling() is idempotent (guarded by isStarted), so this is safe even if the
+// primary attempt above already succeeded.
+try {
+    panel.addEventListener("show", engagePolling);
+} catch (eShow) {
+    // some hosts may not support this listener on Panel objects; primary attempt above
+    // and the manual Reconnect button remain as fallbacks
+}
 
 // Force layout (required for dockable panels)
 if (panel instanceof Window) {
