@@ -4,6 +4,8 @@ The AE MCP Bridge connects Claude Desktop to Adobe After Effects, allowing Claud
 
 **Prerequisite:** After Effects and Claude Desktop are already installed. No other tools are required beforehand.
 
+<iframe width="560" height="315" src="https://www.youtube-nocookie.com/embed/OiD33_AEHec?si=w44FXqQws6FKb-7w&amp;controls=0" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
+
 ---
 
 ## 1. Install Node.js
