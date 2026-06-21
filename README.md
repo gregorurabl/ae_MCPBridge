@@ -4,6 +4,13 @@ The AE MCP Bridge connects Claude Desktop to Adobe After Effects, allowing Claud
 
 **Prerequisite:** After Effects and Claude Desktop are already installed. No other tools are required beforehand.
 
+**WARNING:** This project is currently in beta and under active development.
+There is no official support at this stage. Use it at your own risk, especially in production environments.
+
+That said, if you find it useful and decide to integrate it into your workflow, I’m glad it creates value for you. In that case, feel free to support the project via the GitHub Sponsors button. It helps justify further development and continued improvements.
+
+Appreciate any feedback, ideas, or contributions.
+
 [![MCP Bridge Trailer](https://github.com/user-attachments/assets/8b2dab0a-9f2e-44bf-8515-30f5169109c8)](https://www.youtube-nocookie.com/embed/OiD33_AEHec?si=w44FXqQws6FKb-7w&amp;controls=0)
 
 
