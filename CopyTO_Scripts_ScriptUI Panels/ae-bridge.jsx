@@ -18,6 +18,8 @@ var config = {
 
 var isPaused = false;
 var isStarted = false; // guards against double-registering scheduleTask
+var lastPollTime = 0; // heartbeat written by pollCommands()
+var watchdogStarted = false; // guards against double-registering the watchdog
 
 // Minimal JSON parser for ExtendScript (no native JSON object available)
 function parseJSON(str) {
@@ -82,6 +84,7 @@ function ensureDirectories() {
 }
 
 function pollCommands() {
+    lastPollTime = new Date().getTime(); // heartbeat - proves the scheduled task actually fired
     if (isPaused) return;
 
     var dir = new Folder(config.commands);
@@ -125,9 +128,40 @@ function updateStatusLabel() {
 // Idempotent: safe to call multiple times, only registers scheduleTask once per "session"
 function engagePolling() {
     if (isStarted) return;
-    isStarted = true;
-    app.scheduleTask("pollCommands()", 500, true);
+    try {
+        app.scheduleTask("pollCommands()", 500, true);
+        isStarted = true;
+    } catch (eSchedule) {
+        isStarted = false;
+    }
     updateStatusLabel();
+}
+
+// Checks the heartbeat written by pollCommands() instead of trusting isStarted alone.
+// Runs every 3s for the lifetime of the panel.
+function verifyAndRecover() {
+    var now = new Date().getTime();
+    var stale = (lastPollTime === 0) || ((now - lastPollTime) > 2000);
+    $.writeln("[ae-bridge] verifyAndRecover: lastPollTime=" + lastPollTime + " stale=" + stale + " isPaused=" + isPaused + " isStarted=" + isStarted);
+    if (stale && !isPaused) {
+        isStarted = false;
+        engagePolling();
+    }
+}
+
+// Arms the recurring watchdog. Called from multiple independent trigger points
+// (top-level load, "show" event, onDraw) so a failed registration attempt at one
+// trigger point doesn't permanently block recovery.
+function armWatchdog() {
+    if (watchdogStarted) return;
+    watchdogStarted = true;
+    $.writeln("[ae-bridge] armWatchdog: arming at " + new Date().toString());
+    try {
+        app.scheduleTask("verifyAndRecover()", 3000, true);
+    } catch (eWatchdog) {
+        watchdogStarted = false;
+        $.writeln("[ae-bridge] armWatchdog: scheduleTask threw - " + eWatchdog.toString());
+    }
 }
 
 // Manual recovery: mirrors what closing and reopening the panel via the Window menu
@@ -139,6 +173,7 @@ function reconnect() {
     ensureDirectories();
     isStarted = false; // force re-registration even if engagePolling ran before
     engagePolling();
+    armWatchdog();
 }
 
 function togglePause() {
@@ -176,20 +211,31 @@ updateStatusLabel();
 
 // Primary attempt: register immediately, as before.
 engagePolling();
+armWatchdog();
 
 // Secondary safety net: also (re-)attempt once the panel actually finishes rendering.
 // On a dockable panel restored as part of a saved workspace at AE launch, app.scheduleTask
 // calls made during the panel's raw script-load phase can silently fail to register
 // before AE's main idle loop is fully active. Binding to "show" defers the call until
 // the panel is genuinely rendered, which happens later and more reliably.
-// engagePolling() is idempotent (guarded by isStarted), so this is safe even if the
+// engagePolling() and armWatchdog() are both idempotent, so this is safe even if the
 // primary attempt above already succeeded.
 try {
-    panel.addEventListener("show", engagePolling);
+    panel.addEventListener("show", function() {
+        engagePolling();
+        armWatchdog();
+    });
 } catch (eShow) {
     // some hosts may not support this listener on Panel objects; primary attempt above
     // and the manual Reconnect button remain as fallbacks
 }
+
+// Third trigger point: onDraw fires on first paint regardless of how the panel became
+// visible, including workspace-restored panels at AE launch where "show" never fires.
+// Not independently verified for plain statictext controls in this AE version.
+panel.statusLabel.onDraw = function() {
+    armWatchdog();
+};
 
 // Force layout (required for dockable panels)
 if (panel instanceof Window) {
