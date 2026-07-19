@@ -121,6 +121,51 @@ server.tool(
     }
 );
 
+// Shape-Layer aus Punktkoordinaten erzeugen (z.B. Grenzlinien aus Kartenanalyse)
+server.tool(
+    "create_shape_layer",
+    {
+        comp_name: z.string(),
+        layer_name: z.string(),
+        points: z.array(z.tuple([z.number(), z.number()])).describe("Vertices im Comp-Koordinatenraum, z.B. [[100,100],[200,150]]"),
+        closed: z.boolean().default(false),
+        stroke_color: z.tuple([z.number(), z.number(), z.number()]).default([1, 0, 0]).describe("RGB 0-1"),
+        stroke_width: z.number().default(3)
+    },
+    async ({ comp_name, layer_name, points, closed, stroke_color, stroke_width }) => {
+        const pointsJson = JSON.stringify(points);
+        const colorJson = JSON.stringify(stroke_color);
+        const jsx = `
+            var comp = null;
+            for (var i = 1; i <= app.project.numItems; i++) {
+                if (app.project.item(i).name === "${comp_name}") { comp = app.project.item(i); break; }
+            }
+            if (!comp) throw new Error("Comp not found: ${comp_name}");
+
+            var shapeLayer = comp.layers.addShape();
+            shapeLayer.name = "${layer_name}";
+
+            var contents = shapeLayer.property("ADBE Root Vectors Group");
+            var shapeGroup = contents.addProperty("ADBE Vector Group");
+            var shapeGroupContents = shapeGroup.property("ADBE Vectors Group");
+            var pathProp = shapeGroupContents.addProperty("ADBE Vector Shape - Group");
+
+            var shape = new Shape();
+            shape.vertices = ${pointsJson};
+            shape.closed = ${closed};
+            pathProp.property("ADBE Vector Shape").setValue(shape);
+
+            var strokeProp = shapeGroupContents.addProperty("ADBE Vector Graphic - Stroke");
+            strokeProp.property("ADBE Vector Stroke Color").setValue(${colorJson});
+            strokeProp.property("ADBE Vector Stroke Width").setValue(${stroke_width});
+
+            "Shape-Layer erzeugt: ${layer_name}";
+        `;
+        const data = await runInAE(jsx);
+        return { content: [{ type: "text", text: data }] };
+    }
+);
+
 // Comp zur Render Queue hinzufuegen und rendern
 server.tool(
     "render_queue",
